@@ -9,6 +9,7 @@ const authRoutes = require('./routes/auth.routes');
 const eventRoutes = require('./routes/event.routes');
 const registrationRoutes = require('./routes/registration.routes');
 const checkinRoutes = require('./routes/checkin.routes');
+const volunteerRoutes = require('./routes/volunteer.routes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -37,6 +38,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api', registrationRoutes);
 app.use('/api/checkin', checkinRoutes);
+app.use('/api', volunteerRoutes);
 
 app.use(errorHandler);
 
