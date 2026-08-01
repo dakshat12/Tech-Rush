@@ -1,9 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const checkinController = require('../controllers/checkin.controller');
-const authMiddleware = require('../middleware/auth');
 
-router.post('/checkin', authMiddleware, checkinController.checkIn);
-router.post('/checkout', authMiddleware, checkinController.checkOut);
+const { checkIn } = require('../controllers/checkin.controller');
+const authMiddleware = require('../middleware/auth');
+const roleCheck = require('../middleware/roleCheck');
+
+router.post('/', authMiddleware, roleCheck(['VOLUNTEER', 'ORGANIZER']), checkIn);
 
 module.exports = router;
+

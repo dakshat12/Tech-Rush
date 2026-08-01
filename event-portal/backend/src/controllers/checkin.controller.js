@@ -1,57 +1,72 @@
 const prisma = require('../config/db');
 
-exports.checkIn = async (req, res) => {
+
+// POST /api/checkin
+// body: { qrToken, type: "check_in" | "check_out" }
+const checkIn = async (req, res) => {
   try {
-    const { qrToken } = req.body;
-    const scannedById = req.user.id;
+    const { qrToken, type } = req.body;
+
+    if (!qrToken || !type) {
+      return res.status(400).json({ error: 'qrToken and type are required' });
+    }
+
+    if (type !== 'check_in' && type !== 'check_out') {
+      return res.status(400).json({ error: 'type must be "check_in" or "check_out"' });
+    }
 
     const registration = await prisma.registration.findUnique({
       where: { qrToken },
-      include: { checkIns: true }
-    });
-    if (!registration) return res.status(404).json({ error: 'Invalid QR code' });
-
-    const alreadyIn = registration.checkIns.some(c => c.type === 'check_in')
-      && !registration.checkIns.some(c => c.type === 'check_out');
-    if (alreadyIn) return res.status(400).json({ error: 'Already checked in' });
-
-    await prisma.checkIn.create({
-      data: { registrationId: registration.id, scannedById, type: 'check_in' }
+      include: { event: true, user: true },
     });
 
-    const updated = await prisma.registration.update({
-      where: { qrToken },
-      data: { status: 'checked-in' }
-    });
-
-    res.json({ message: 'Checked in successfully', registration: updated });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-exports.checkOut = async (req, res) => {
-  try {
-    const { qrToken } = req.body;
-    const scannedById = req.user.id;
-
-    const registration = await prisma.registration.findUnique({ where: { qrToken } });
-    if (!registration) return res.status(404).json({ error: 'Invalid QR code' });
-    if (registration.status !== 'checked-in') {
-      return res.status(400).json({ error: 'Attendee has not checked in yet' });
+    if (!registration) {
+      return res.status(404).json({ error: 'Invalid QR code — registration not found' });
     }
 
-    await prisma.checkIn.create({
-      data: { registrationId: registration.id, scannedById, type: 'check_out' }
+    if (type === 'check_in' && registration.status === 'checked_in') {
+      return res.status(409).json({ error: 'This attendee is already checked in' });
+    }
+    if (type === 'check_out' && registration.status !== 'checked_in') {
+      return res.status(409).json({ error: 'This attendee must be checked in before checking out' });
+    }
+
+    const checkInRecord = await prisma.checkIn.create({
+      data: {
+        registrationId: registration.id,
+        scannedById: req.user.id,
+        type,
+      },
     });
 
-    const updated = await prisma.registration.update({
-      where: { qrToken },
-      data: { status: 'checked-out' }
+    const newStatus = type === 'check_in' ? 'checked_in' : 'checked_out';
+    const updatedRegistration = await prisma.registration.update({
+      where: { id: registration.id },
+      data: { status: newStatus },
     });
 
-    res.json({ message: 'Checked out successfully', registration: updated });
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`event_${registration.eventId}`).emit('attendance_update', {
+        registrationId: registration.id,
+        userName: registration.user.name,
+        type,
+        status: newStatus,
+        timestamp: checkInRecord.timestamp,
+      });
+    }
+
+    res.status(200).json({
+      message: `${type === 'check_in' ? 'Checked in' : 'Checked out'} successfully`,
+      registration: updatedRegistration,
+      attendeeName: registration.user.name,
+      eventTitle: registration.event.title,
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Failed to process check-in' });
   }
 };
+
+module.exports = { checkIn };
+

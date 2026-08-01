@@ -1,35 +1,52 @@
 const crypto = require('crypto');
+const QRCode = require('qrcode');
 const prisma = require('../config/db');
+
+// POST /api/events/:id/register
 const registerForEvent = async (req, res) => {
   try {
-    const eventId = parseInt(req.params.eventId);
+    const eventId = parseInt(req.params.id);
     const userId = req.user.id;
+
     const event = await prisma.event.findUnique({ where: { id: eventId } });
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
     }
+
     const existing = await prisma.registration.findFirst({
       where: { eventId, userId },
     });
     if (existing) {
-      return res.status(409).json({ error: 'Already registered for this event' });
+      return res.status(409).json({ error: 'You are already registered for this event' });
     }
+
+    const qrToken = crypto.randomUUID();
+
     const registration = await prisma.registration.create({
       data: {
         eventId,
         userId,
-        qrToken: crypto.randomUUID(),
+        qrToken,
       },
       include: {
         event: { select: { id: true, title: true, startTime: true, venue: true } },
       },
     });
-    res.status(201).json({ message: 'Registered successfully', registration });
+
+    const qrCodeDataUrl = await QRCode.toDataURL(qrToken);
+
+    res.status(201).json({
+      message: 'Registered successfully',
+      registration,
+      qrCode: qrCodeDataUrl,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to register for event' });
   }
 };
+
+// GET /api/registrations/me
 const getMyRegistrations = async (req, res) => {
   try {
     const registrations = await prisma.registration.findMany({
@@ -39,12 +56,14 @@ const getMyRegistrations = async (req, res) => {
       },
       orderBy: { registeredAt: 'desc' },
     });
-    res.json({ registrations });
+
+    res.status(200).json({ registrations });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch registrations' });
   }
 };
+
 const getEventRegistrations = async (req, res) => {
   try {
     const eventId = parseInt(req.params.eventId);
@@ -68,6 +87,7 @@ const getEventRegistrations = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch event registrations' });
   }
 };
+
 const getRegistrationByToken = async (req, res) => {
   try {
     const registration = await prisma.registration.findUnique({
@@ -86,6 +106,7 @@ const getRegistrationByToken = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch registration' });
   }
 };
+
 module.exports = {
   registerForEvent,
   getMyRegistrations,
