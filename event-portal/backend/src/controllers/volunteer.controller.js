@@ -1,92 +1,56 @@
 const prisma = require('../config/db');
 
-// POST /api/events/:id/assign (organizer only)
-// body: { volunteerId, taskDesc }
-const assignVolunteer = async (req, res) => {
+exports.assignVolunteer = async (req, res) => {
   try {
-    const eventId = parseInt(req.params.id);
+    const eventId = parseInt(req.params.eventId);
     const { volunteerId, taskDesc } = req.body;
 
-    if (!volunteerId || !taskDesc) {
-      return res.status(400).json({ error: 'volunteerId and taskDesc are required' });
-    }
-
-    const event = await prisma.event.findUnique({ where: { id: eventId } });
-    if (!event) {
-      return res.status(404).json({ error: 'Event not found' });
-    }
-
-    if (event.organizerId !== req.user.id) {
-      return res.status(403).json({ error: 'You can only assign volunteers to events you created' });
-    }
-
-    const volunteer = await prisma.user.findUnique({ where: { id: volunteerId } });
-    if (!volunteer || volunteer.role !== 'VOLUNTEER') {
-      return res.status(400).json({ error: 'Specified user is not a valid volunteer' });
-    }
-
     const assignment = await prisma.volunteerAssignment.create({
-      data: {
-        eventId,
-        volunteerId,
-        taskDesc,
-      },
+      data: { eventId, volunteerId, taskDesc, status: 'pending' }
     });
 
-    res.status(201).json({ message: 'Volunteer assigned successfully', assignment });
+    res.status(201).json({ message: 'Volunteer assigned', assignment });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to assign volunteer' });
+    res.status(500).json({ error: err.message });
   }
 };
 
-// GET /api/volunteers/me/tasks (volunteer's own tasks)
-const getMyTasks = async (req, res) => {
+exports.getMyTasks = async (req, res) => {
   try {
+    const volunteerId = req.user.id;
     const tasks = await prisma.volunteerAssignment.findMany({
-      where: { volunteerId: req.user.id },
-      include: { event: true },
-      orderBy: { assignedAt: 'desc' },
+      where: { volunteerId },
+      include: { event: true }
     });
-
-    res.status(200).json({ tasks });
+    res.json(tasks);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch tasks' });
+    res.status(500).json({ error: err.message });
   }
 };
 
-// PUT /api/tasks/:id/status (volunteer updates their own task)
-// body: { status: "pending" | "in_progress" | "done" }
-const updateTaskStatus = async (req, res) => {
+exports.getEventVolunteers = async (req, res) => {
   try {
-    const taskId = parseInt(req.params.id);
-    const { status } = req.body;
-
-    const validStatuses = ['pending', 'in_progress', 'done'];
-    if (!status || !validStatuses.includes(status)) {
-      return res.status(400).json({ error: 'status must be one of: pending, in_progress, done' });
-    }
-
-    const task = await prisma.volunteerAssignment.findUnique({ where: { id: taskId } });
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
-    }
-
-    if (task.volunteerId !== req.user.id) {
-      return res.status(403).json({ error: 'You can only update your own tasks' });
-    }
-
-    const updatedTask = await prisma.volunteerAssignment.update({
-      where: { id: taskId },
-      data: { status },
+    const eventId = parseInt(req.params.eventId);
+    const assignments = await prisma.volunteerAssignment.findMany({
+      where: { eventId },
+      include: { volunteer: true }
     });
-
-    res.status(200).json({ message: 'Task status updated', task: updatedTask });
+    res.json(assignments);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to update task status' });
+    res.status(500).json({ error: err.message });
   }
 };
 
-module.exports = { assignVolunteer, getMyTasks, updateTaskStatus };
+exports.updateTaskStatus = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { status } = req.body;
+    const assignment = await prisma.volunteerAssignment.update({
+      where: { id },
+      data: { status }
+    });
+    res.json({ message: 'Task updated', assignment });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

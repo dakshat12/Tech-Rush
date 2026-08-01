@@ -10,6 +10,7 @@ const eventRoutes = require('./routes/event.routes');
 const registrationRoutes = require('./routes/registration.routes');
 const checkinRoutes = require('./routes/checkin.routes');
 const volunteerRoutes = require('./routes/volunteer.routes');
+
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();

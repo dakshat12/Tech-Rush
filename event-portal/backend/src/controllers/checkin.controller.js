@@ -1,5 +1,6 @@
 const prisma = require('../config/db');
 
+
 // POST /api/checkin
 // body: { qrToken, type: "check_in" | "check_out" }
 const checkIn = async (req, res) => {
@@ -68,3 +69,4 @@ const checkIn = async (req, res) => {
 };
 
 module.exports = { checkIn };
+
