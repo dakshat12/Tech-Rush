@@ -1,5 +1,5 @@
 import { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 
 const Login = () => {
@@ -49,6 +49,9 @@ const Login = () => {
         {error && <p style={{ color: 'red' }}>{error}</p>}
         <button type="submit" style={{ width: '100%', padding: 10 }}>Login</button>
       </form>
+      <p style={{ marginTop: 16 }}>
+        Don't have an account? <Link to="/signup">Sign Up</Link>
+      </p>
     </div>
   );
 };
