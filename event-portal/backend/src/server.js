@@ -37,9 +37,9 @@ app.get('/', (req, res) => {
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
-app.use('/api/registrations', registrationRoutes);
+app.use('/api', registrationRoutes);
 app.use('/api/checkin', checkinRoutes);
-app.use('/api/volunteers', volunteerRoutes);
+app.use('/api', volunteerRoutes);
 
 app.use(errorHandler);
 
