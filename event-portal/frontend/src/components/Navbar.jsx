@@ -8,44 +8,42 @@ const Navbar = () => {
 
   if (!user) return null;
 
-  const linkStyle = (path) => ({
-    marginRight: 16,
-    textDecoration: 'none',
-    color: location.pathname === path ? '#1565c0' : '#333',
-    fontWeight: location.pathname === path ? 'bold' : 'normal',
-  });
+  const isActive = (path) => location.pathname === path;
 
   return (
-    <nav
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '12px 24px',
-        borderBottom: '1px solid #ddd',
-        fontFamily: 'sans-serif',
-      }}
-    >
-      <div>
+    <nav className="navbar">
+      <div className="navbar-links">
         {user.role === 'ORGANIZER' && (
-          <Link to="/organizer/dashboard" style={linkStyle('/organizer/dashboard')}>Dashboard</Link>
+          <Link to="/organizer/dashboard" className={isActive('/organizer/dashboard') ? 'active' : ''}>
+            Dashboard
+          </Link>
         )}
         {user.role === 'ATTENDEE' && (
           <>
-            <Link to="/attendee/events" style={linkStyle('/attendee/events')}>Browse Events</Link>
-            <Link to="/attendee/registrations" style={linkStyle('/attendee/registrations')}>My Registrations</Link>
+            <Link to="/attendee/events" className={isActive('/attendee/events') ? 'active' : ''}>
+              Browse Events
+            </Link>
+            <Link to="/attendee/registrations" className={isActive('/attendee/registrations') ? 'active' : ''}>
+              My Registrations
+            </Link>
           </>
         )}
         {user.role === 'VOLUNTEER' && (
           <>
-            <Link to="/volunteer/tasks" style={linkStyle('/volunteer/tasks')}>My Tasks</Link>
-            <Link to="/volunteer/scan" style={linkStyle('/volunteer/scan')}>Scan QR</Link>
+            <Link to="/volunteer/tasks" className={isActive('/volunteer/tasks') ? 'active' : ''}>
+              My Tasks
+            </Link>
+            <Link to="/volunteer/scan" className={isActive('/volunteer/scan') ? 'active' : ''}>
+              Scan QR
+            </Link>
           </>
         )}
       </div>
-      <div>
-        <span style={{ marginRight: 12, color: '#666' }}>Hi, {user.name}</span>
-        <button onClick={logout}>Logout</button>
+      <div className="navbar-user">
+        <span>{user.name}</span>
+        <button className="btn btn-secondary" onClick={logout} style={{ padding: '6px 14px' }}>
+          Logout
+        </button>
       </div>
     </nav>
   );
