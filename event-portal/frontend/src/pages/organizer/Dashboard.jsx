@@ -12,20 +12,19 @@ const Dashboard = () => {
   const [error, setError] = useState('');
 
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    venue: '',
-    startTime: '',
-    endTime: '',
-  });
+  const [form, setForm] = useState({ title: '', description: '', venue: '', startTime: '', endTime: '' });
   const [formError, setFormError] = useState('');
   const [creating, setCreating] = useState(false);
+
+  const [assignments, setAssignments] = useState([]);
+  const [volunteerEmail, setVolunteerEmail] = useState('');
+  const [taskDesc, setTaskDesc] = useState('');
+  const [assignError, setAssignError] = useState('');
+  const [assigning, setAssigning] = useState(false);
 
   const fetchEvents = async () => {
     try {
       const res = await axiosInstance.get('/events');
-      // Only show events this organizer actually created
       const myEvents = res.data.events.filter((e) => e.organizerId === user.id);
       setEvents(myEvents);
       if (myEvents.length > 0 && !selectedEventId) {
@@ -51,9 +50,21 @@ const Dashboard = () => {
     }
   }, [selectedEventId]);
 
+  const fetchAssignments = useCallback(async () => {
+    if (!selectedEventId) return;
+    try {
+      const res = await axiosInstance.get(`/events/${selectedEventId}/volunteers`);
+      setAssignments(res.data.assignments);
+    } catch (err) {
+      // Non-critical — endpoint might not exist yet, or no assignments — fail silently
+      setAssignments([]);
+    }
+  }, [selectedEventId]);
+
   useEffect(() => {
     fetchAnalytics();
-  }, [fetchAnalytics]);
+    fetchAssignments();
+  }, [fetchAnalytics, fetchAssignments]);
 
   useEffect(() => {
     if (!selectedEventId) return;
@@ -66,9 +77,7 @@ const Dashboard = () => {
     return () => socket.disconnect();
   }, [selectedEventId, fetchAnalytics]);
 
-  const handleFormChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const handleFormChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleCreateEvent = async (e) => {
     e.preventDefault();
@@ -92,6 +101,28 @@ const Dashboard = () => {
     }
   };
 
+  const handleAssignVolunteer = async (e) => {
+    e.preventDefault();
+    setAssignError('');
+    setAssigning(true);
+    try {
+      // Look up the volunteer's user id by email first — need a lightweight way to do this.
+      // Simplest approach without a new backend endpoint: ask the organizer for the volunteer's ID directly,
+      // OR extend the backend later. For now, we accept email and resolve via a small helper endpoint.
+      const res = await axiosInstance.post(`/events/${selectedEventId}/assign`, {
+        volunteerEmail,
+        taskDesc,
+      });
+      setVolunteerEmail('');
+      setTaskDesc('');
+      await fetchAssignments();
+    } catch (err) {
+      setAssignError(err.response?.data?.error || 'Failed to assign volunteer');
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   return (
     <div style={{ maxWidth: 800, margin: '40px auto', fontFamily: 'sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -104,65 +135,25 @@ const Dashboard = () => {
       {error && <p style={{ color: 'red' }}>{error}</p>}
 
       {showForm && (
-        <form
-          onSubmit={handleCreateEvent}
-          style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, marginTop: 16 }}
-        >
+        <form onSubmit={handleCreateEvent} style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, marginTop: 16 }}>
           <h3 style={{ marginTop: 0 }}>New Event</h3>
           <div style={{ marginBottom: 10 }}>
-            <input
-              type="text"
-              name="title"
-              placeholder="Event Title"
-              value={form.title}
-              onChange={handleFormChange}
-              style={{ width: '100%', padding: 8 }}
-              required
-            />
+            <input type="text" name="title" placeholder="Event Title" value={form.title} onChange={handleFormChange} style={{ width: '100%', padding: 8 }} required />
           </div>
           <div style={{ marginBottom: 10 }}>
-            <textarea
-              name="description"
-              placeholder="Description"
-              value={form.description}
-              onChange={handleFormChange}
-              style={{ width: '100%', padding: 8, minHeight: 60 }}
-              required
-            />
+            <textarea name="description" placeholder="Description" value={form.description} onChange={handleFormChange} style={{ width: '100%', padding: 8, minHeight: 60 }} required />
           </div>
           <div style={{ marginBottom: 10 }}>
-            <input
-              type="text"
-              name="venue"
-              placeholder="Venue"
-              value={form.venue}
-              onChange={handleFormChange}
-              style={{ width: '100%', padding: 8 }}
-              required
-            />
+            <input type="text" name="venue" placeholder="Venue" value={form.venue} onChange={handleFormChange} style={{ width: '100%', padding: 8 }} required />
           </div>
           <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 12, color: '#666' }}>Start Time</label>
-              <input
-                type="datetime-local"
-                name="startTime"
-                value={form.startTime}
-                onChange={handleFormChange}
-                style={{ width: '100%', padding: 8 }}
-                required
-              />
+              <input type="datetime-local" name="startTime" value={form.startTime} onChange={handleFormChange} style={{ width: '100%', padding: 8 }} required />
             </div>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 12, color: '#666' }}>End Time</label>
-              <input
-                type="datetime-local"
-                name="endTime"
-                value={form.endTime}
-                onChange={handleFormChange}
-                style={{ width: '100%', padding: 8 }}
-                required
-              />
+              <input type="datetime-local" name="endTime" value={form.endTime} onChange={handleFormChange} style={{ width: '100%', padding: 8 }} required />
             </div>
           </div>
           {formError && <p style={{ color: 'red' }}>{formError}</p>}
@@ -177,14 +168,9 @@ const Dashboard = () => {
         {events.length === 0 ? (
           <p style={{ color: '#888' }}>You haven't created any events yet.</p>
         ) : (
-          <select
-            value={selectedEventId || ''}
-            onChange={(e) => setSelectedEventId(parseInt(e.target.value))}
-          >
+          <select value={selectedEventId || ''} onChange={(e) => setSelectedEventId(parseInt(e.target.value))}>
             {events.map((event) => (
-              <option key={event.id} value={event.id}>
-                {event.title}
-              </option>
+              <option key={event.id} value={event.id}>{event.title}</option>
             ))}
           </select>
         )}
@@ -199,14 +185,53 @@ const Dashboard = () => {
         </div>
       )}
 
+      {selectedEventId && (
+        <div style={{ marginTop: 32 }}>
+          <h3>Volunteers</h3>
+          <form onSubmit={handleAssignVolunteer} style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            <input
+              type="email"
+              placeholder="Volunteer's email"
+              value={volunteerEmail}
+              onChange={(e) => setVolunteerEmail(e.target.value)}
+              style={{ padding: 8, flex: 1, minWidth: 180 }}
+              required
+            />
+            <input
+              type="text"
+              placeholder="Task description"
+              value={taskDesc}
+              onChange={(e) => setTaskDesc(e.target.value)}
+              style={{ padding: 8, flex: 2, minWidth: 200 }}
+              required
+            />
+            <button type="submit" disabled={assigning} style={{ padding: '8px 16px' }}>
+              {assigning ? 'Assigning...' : 'Assign'}
+            </button>
+          </form>
+          {assignError && <p style={{ color: 'red' }}>{assignError}</p>}
+
+          {assignments.length === 0 ? (
+            <p style={{ color: '#888' }}>No volunteers assigned yet.</p>
+          ) : (
+            <ul style={{ listStyle: 'none', padding: 0 }}>
+              {assignments.map((a) => (
+                <li key={a.id} style={{ padding: '8px 0', borderBottom: '1px solid #eee' }}>
+                  <strong>{a.volunteer?.name}</strong> — {a.taskDesc} ({a.status})
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       <div style={{ marginTop: 32 }}>
         <h3>Live Activity</h3>
         {liveLog.length === 0 && <p style={{ color: '#888' }}>No check-in activity yet.</p>}
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {liveLog.map((entry, i) => (
             <li key={i} style={{ padding: '8px 0', borderBottom: '1px solid #eee' }}>
-              <strong>{entry.userName}</strong> {entry.type === 'check_in' ? 'checked in' : 'checked out'} —{' '}
-              {new Date(entry.timestamp).toLocaleTimeString()}
+              <strong>{entry.userName}</strong> {entry.type === 'check_in' ? 'checked in' : 'checked out'} — {new Date(entry.timestamp).toLocaleTimeString()}
             </li>
           ))}
         </ul>
@@ -216,16 +241,7 @@ const Dashboard = () => {
 };
 
 const StatCard = ({ label, value, highlight }) => (
-  <div
-    style={{
-      flex: 1,
-      padding: 16,
-      border: '1px solid #ddd',
-      borderRadius: 8,
-      textAlign: 'center',
-      background: highlight ? '#e8f5e9' : '#fafafa',
-    }}
-  >
+  <div style={{ flex: 1, padding: 16, border: '1px solid #ddd', borderRadius: 8, textAlign: 'center', background: highlight ? '#e8f5e9' : '#fafafa' }}>
     <div style={{ fontSize: 28, fontWeight: 'bold' }}>{value}</div>
     <div style={{ fontSize: 13, color: '#666' }}>{label}</div>
   </div>
