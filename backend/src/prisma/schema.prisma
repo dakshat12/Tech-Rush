@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ORGANIZER
+  VOLUNTEER
+  ATTENDEE
+}
+
+model User {
+  id            Int                   @id @default(autoincrement())
+  name          String
+  email         String                @unique
+  passwordHash  String?
+  googleId      String?               @unique
+  role          Role                  @default(ATTENDEE)
+  avatarUrl     String?
+  roleTitle     String?               @default("Member")
+  xp            Int                   @default(0)
+  level         Int                   @default(1)
+  streak        Int                   @default(0)
+  createdAt     DateTime              @default(now())
+
+  eventsCreated Event[]               @relation("OrganizerEvents")
+  registrations Registration[]
+  assignments   VolunteerAssignment[]
+  tasks         Task[]
+  badges        UserBadge[]
+}
+
+model Event {
+  id            Int                   @id @default(autoincrement())
+  title         String
+  description   String
+  venue         String
+  location      String?
+  category      String                @default("Tech")
+  imageUrl      String?
+  capacity      Int                   @default(500)
+  price         String                @default("Free")
+  trending      Boolean               @default(false)
+  tags          String[]              @default([])
+  color         String                @default("#7c3aed")
+  startTime     DateTime
+  endTime       DateTime
+  status        String                @default("upcoming")
+  organizerId   Int
+  organizer     User                  @relation("OrganizerEvents", fields: [organizerId], references: [id])
+
+  registrations Registration[]
+  assignments   VolunteerAssignment[]
+  tasks         Task[]
+  announcements Announcement[]
+  createdAt     DateTime              @default(now())
+}
+
+model Registration {
+  id           Int       @id @default(autoincrement())
+  eventId      Int
+  event        Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId       Int
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  qrToken      String    @unique
+  status       String    @default("registered")
+  registeredAt DateTime  @default(now())
+  checkIns     CheckIn[]
+}
+
+model CheckIn {
+  id             Int          @id @default(autoincrement())
+  registrationId Int
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  scannedById    Int
+  type           String       // "check_in" | "check_out"
+  timestamp      DateTime     @default(now())
+}
+
+model VolunteerAssignment {
+  id          Int      @id @default(autoincrement())
+  eventId     Int
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  volunteerId Int
+  volunteer   User     @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+  taskDesc    String
+  status      String   @default("pending")
+  assignedAt  DateTime @default(now())
+}
+
+model Task {
+  id           Int      @id @default(autoincrement())
+  title        String
+  priority     String   @default("medium") // "high", "medium", "low"
+  stage        String   @default("todo") // "todo", "inProgress", "done"
+  due          String?
+  assigneeName String?
+  assigneeId   Int?
+  assignee     User?    @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  eventId      Int?
+  event        Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+}
+
+model Badge {
+  id    Int         @id @default(autoincrement())
+  icon  String
+  name  String      @unique
+  desc  String
+  users UserBadge[]
+}
+
+model UserBadge {
+  id       Int      @id @default(autoincrement())
+  userId   Int
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeId  Int
+  badge    Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  earnedAt DateTime @default(now())
+}
+
+model Announcement {
+  id        Int      @id @default(autoincrement())
+  title     String
+  body      String
+  time      String?
+  urgent    Boolean  @default(false)
+  eventId   Int?
+  event     Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+}
